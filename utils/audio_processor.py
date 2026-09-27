@@ -26,54 +26,61 @@ def download_youtube_audio(url: str) -> str:
             }
         ],
 
-        "quiet": False,
         "noplaylist": True,
+        "quiet": False,
+
+        # Help yt-dlp use a browser-like client
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web", "android"],
+            }
+        },
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
 
-    # FFmpeg converts the downloaded file to WAV
+    except yt_dlp.utils.DownloadError as e:
+        raise RuntimeError(
+            f"Could not download YouTube audio: {e}"
+        ) from e
+
     wav_path = os.path.splitext(filename)[0] + ".wav"
 
     if not os.path.exists(wav_path):
         raise FileNotFoundError(
-            f"Audio was downloaded but WAV file was not found: {wav_path}"
+            f"WAV file was not created: {wav_path}"
         )
 
     return wav_path
 
 
 def convert_to_wav(input_path: str) -> str:
-    """Convert any audio/video file to WAV format."""
+    """Convert a local audio/video file to WAV."""
 
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
 
     audio = AudioSegment.from_file(input_path)
-
-    # Mono 16 kHz audio is suitable for Whisper
     audio = audio.set_channels(1).set_frame_rate(16000)
-
     audio.export(output_path, format="wav")
 
     return output_path
 
 
 def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
-    """Split WAV audio into smaller chunks."""
+    """Split WAV audio into chunks."""
 
     audio = AudioSegment.from_wav(wav_path)
 
     chunk_ms = chunk_minutes * 60 * 1000
-
     chunks = []
 
     for i, start in enumerate(range(0, len(audio), chunk_ms)):
         chunk = audio[start:start + chunk_ms]
 
         chunk_path = f"{wav_path}_chunk_{i}.wav"
-
         chunk.export(chunk_path, format="wav")
 
         chunks.append(chunk_path)
@@ -82,7 +89,7 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
 
 
 def process_input(source: str) -> list:
-    """Download/convert input and split it into audio chunks."""
+    """Process a YouTube URL or local audio/video file."""
 
     if source.startswith(("http://", "https://")):
         print("Detected YouTube URL. Downloading audio...")
