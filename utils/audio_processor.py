@@ -16,13 +16,7 @@ def download_youtube_audio(url: str) -> str:
 
     ydl_opts = {
         "format": "bestaudio/best",
-
         "outtmpl": output_path,
-
-        # JavaScript runtime required by current YouTube extraction
-        "js_runtimes": {
-            "deno": {}
-        },
 
         "postprocessors": [
             {
@@ -38,11 +32,9 @@ def download_youtube_audio(url: str) -> str:
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-
-        # Get the actual downloaded filename
         filename = ydl.prepare_filename(info)
 
-    # FFmpegExtractAudio changes the extension to .wav
+    # FFmpeg converts the downloaded file to WAV
     wav_path = os.path.splitext(filename)[0] + ".wav"
 
     if not os.path.exists(wav_path):
@@ -60,7 +52,7 @@ def convert_to_wav(input_path: str) -> str:
 
     audio = AudioSegment.from_file(input_path)
 
-    # Whisper works well with mono 16 kHz audio
+    # Mono 16 kHz audio is suitable for Whisper
     audio = audio.set_channels(1).set_frame_rate(16000)
 
     audio.export(output_path, format="wav")
@@ -94,12 +86,10 @@ def process_input(source: str) -> list:
 
     if source.startswith(("http://", "https://")):
         print("Detected YouTube URL. Downloading audio...")
-
         wav_path = download_youtube_audio(source)
 
     else:
         print("Detected local file. Converting to WAV...")
-
         wav_path = convert_to_wav(source)
 
     print("Chunking audio...")
